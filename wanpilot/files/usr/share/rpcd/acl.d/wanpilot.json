@@ -1,0 +1,34 @@
+{
+  "luci-app-wanpilot": {
+    "description": "Grant LuCI access to WANPilot ubus methods and UCI data",
+    "read": {
+      "ubus": {
+        "wanpilot": [
+          "status",
+          "list",
+          "discover",
+          "config",
+          "probe"
+        ]
+      },
+      "uci": [
+        "wanpilot",
+        "network",
+        "firewall"
+      ]
+    },
+    "write": {
+      "ubus": {
+        "wanpilot": [
+          "switch",
+          "config",
+          "probe"
+        ]
+      },
+      "uci": [
+        "wanpilot",
+        "network"
+      ]
+    }
+  }
+}

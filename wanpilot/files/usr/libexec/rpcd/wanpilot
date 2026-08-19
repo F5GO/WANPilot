@@ -1,0 +1,139 @@
+#!/bin/sh
+# WANPilot rpcd exec plugin exposing status, discovery, switching and config methods.
+# shellcheck disable=SC1091,SC3043
+
+. /usr/share/libubox/jshn.sh
+
+rpc_fail() {
+	json_init
+	json_add_boolean "ok" 0
+	json_add_string "error" "$1"
+	json_dump
+	exit 1
+}
+
+rpc_list() {
+	cat <<'EOF'
+{
+  "status": { },
+  "list": { },
+  "discover": { },
+  "switch": { "interface": "String" },
+  "probe": { "interface": "String", "target": "String" },
+  "config": {
+    "action": "String",
+    "zone": "String",
+    "interface": "String",
+    "display_name": "String",
+    "hidden": "Boolean",
+    "order": "Integer"
+  }
+}
+EOF
+}
+
+rpc_call_switch() {
+	local input iface
+
+	read -r input
+	json_load "${input:-{}}"
+	json_get_var iface interface
+	[ -n "$iface" ] || rpc_fail "missing_interface"
+	/usr/bin/wanpilot switch "$iface" --json
+}
+
+rpc_call_probe() {
+	local input iface target
+
+	read -r input
+	json_load "${input:-{}}"
+	json_get_var iface interface
+	json_get_var target target
+	[ -n "$iface" ] || rpc_fail "missing_interface"
+	/usr/bin/wanpilot probe "$iface" "${target:-both}"
+}
+
+rpc_call_config() {
+	local input action zone iface display_name hidden order
+
+	read -r input
+	json_load "${input:-{}}"
+	json_get_var action action
+	json_get_var zone zone
+	json_get_var iface interface
+	json_get_var display_name display_name
+	json_get_var hidden hidden
+	json_get_var order order
+
+	case "$action" in
+		""|get)
+			/usr/bin/wanpilot config get --json
+			;;
+		set-zone)
+			[ -n "$zone" ] || rpc_fail "missing_zone"
+			/usr/bin/wanpilot config set-zone "$zone" || exit 1
+			printf '{"ok":true}\n'
+			;;
+		add-manual)
+			[ -n "$iface" ] || rpc_fail "missing_interface"
+			/usr/bin/wanpilot config add-manual "$iface" "$display_name" || exit 1
+			printf '{"ok":true}\n'
+			;;
+		remove-manual)
+			[ -n "$iface" ] || rpc_fail "missing_interface"
+			/usr/bin/wanpilot config remove-manual "$iface" || exit 1
+			printf '{"ok":true}\n'
+			;;
+		set-name)
+			[ -n "$iface" ] || rpc_fail "missing_interface"
+			[ -n "$display_name" ] || rpc_fail "missing_display_name"
+			/usr/bin/wanpilot config set-name "$iface" "$display_name" || exit 1
+			printf '{"ok":true}\n'
+			;;
+		set-hidden)
+			[ -n "$iface" ] || rpc_fail "missing_interface"
+			/usr/bin/wanpilot config set-hidden "$iface" "${hidden:-0}" || exit 1
+			printf '{"ok":true}\n'
+			;;
+		set-order)
+			[ -n "$iface" ] || rpc_fail "missing_interface"
+			[ -n "$order" ] || rpc_fail "missing_order"
+			/usr/bin/wanpilot config set-order "$iface" "$order" || exit 1
+			printf '{"ok":true}\n'
+			;;
+		*)
+			rpc_fail "unknown_action"
+			;;
+	esac
+}
+
+case "$1" in
+	list)
+		rpc_list
+		;;
+	call)
+		case "$2" in
+			status|list)
+				/usr/bin/wanpilot status --json
+				;;
+			discover)
+				/usr/bin/wanpilot discover --json
+				;;
+			switch)
+				rpc_call_switch
+				;;
+			probe)
+				rpc_call_probe
+				;;
+			config)
+				rpc_call_config
+				;;
+			*)
+				rpc_fail "unknown_method"
+				;;
+		esac
+		;;
+	*)
+		rpc_fail "unknown_rpc_mode"
+		;;
+esac

@@ -1,0 +1,9 @@
+# WANPilot UCI configuration for discovery, overrides, manual entries and state.
+config core 'main'
+	option service_enabled '1'
+	option discovery_zone 'wan'
+	option preferred_metric '10'
+        option online_check_enabled '1'
+        option online_check_url 'https://www.gstatic.com/generate_204'
+        option online_check_interval '10'
+        option online_check_timeout '4'

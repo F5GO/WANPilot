@@ -1,0 +1,164 @@
+#!/bin/sh
+# WANPilot command line entrypoint for service control, status, switching and config.
+# shellcheck disable=SC1091
+
+. /usr/libexec/wanpilot/core.sh
+
+usage() {
+	cat <<'EOF'
+Usage:
+  wanpilot status [--json]
+  wanpilot list [--json]
+  wanpilot discover [--json]
+  wanpilot switch <interface> [--json]
+  wanpilot probe <interface> [google|yandex|both|default] [--json]
+  wanpilot start
+  wanpilot stop
+  wanpilot restart
+  wanpilot sync
+  wanpilot config get [--json]
+  wanpilot config set-zone <zone>
+  wanpilot config add-manual <interface> [display_name]
+  wanpilot config remove-manual <interface>
+  wanpilot config set-name <interface> <display_name>
+  wanpilot config set-hidden <interface> <0|1>
+  wanpilot config set-order <interface> <number>
+EOF
+}
+
+cmd="$1"
+[ -n "$cmd" ] || {
+	usage >&2
+	exit 1
+}
+
+shift
+
+case "$cmd" in
+	status|list)
+		if [ "${1:-}" = "--json" ]; then
+			wp_render_status_json
+		else
+			wp_render_status_text
+		fi
+		;;
+	discover)
+		if [ "${1:-}" = "--json" ]; then
+			wp_render_discover_json
+		else
+			wp_collect_candidates | awk -F '\t' '$6 != "1" { print $5 " (" $1 ")" }'
+		fi
+		;;
+	switch)
+		target_iface="$1"
+		[ -n "$target_iface" ] || {
+			printf 'Missing target interface.\n' >&2
+			exit 1
+		}
+		shift
+		if [ "${1:-}" = "--json" ]; then
+			wp_switch_iface "$target_iface" 1
+		else
+			wp_switch_iface "$target_iface" 0
+		fi
+		;;
+	probe)
+		iface="$1"
+		[ -n "$iface" ] || {
+			printf 'Missing interface.\n' >&2
+			exit 1
+		}
+		shift
+		target="both"
+		if [ "${1:-}" = "--json" ]; then
+			target="both"
+		elif [ -n "${1:-}" ]; then
+			target="$1"
+			shift
+		fi
+		wp_render_probe_json "$iface" "$target"
+		;;
+	start)
+		wp_service_start
+		printf 'WANPilot service started.\n'
+		;;
+	stop)
+		wp_service_stop
+		printf 'WANPilot service stopped.\n'
+		;;
+	restart)
+		wp_service_restart
+		printf 'WANPilot service restarted.\n'
+		;;
+	config)
+		subcmd="$1"
+		shift
+		case "$subcmd" in
+			get)
+				if [ "${1:-}" = "--json" ]; then
+					wp_config_get_json
+				else
+					printf 'discovery_zone=%s\n' "$(wp_get_discovery_zone)"
+					printf 'preferred_metric=%s\n' "$(wp_get_preferred_metric)"
+				fi
+				;;
+			set-zone)
+				[ -n "${1:-}" ] || {
+					printf 'Missing zone name.\n' >&2
+					exit 1
+				}
+				wp_config_set_zone "$1"
+				;;
+			add-manual)
+				[ -n "${1:-}" ] || {
+					printf 'Missing interface name.\n' >&2
+					exit 1
+				}
+				wp_config_add_manual "$1" "${2:-}"
+				;;
+			remove-manual)
+				[ -n "${1:-}" ] || {
+					printf 'Missing interface name.\n' >&2
+					exit 1
+				}
+				wp_config_remove_manual "$1"
+				;;
+			set-name)
+                                if [ -z "${1:-}" ] || [ -z "${2:-}" ]; then
+					printf 'Missing interface name or display name.\n' >&2
+					exit 1
+                                fi
+                                wp_config_set_metadata_field "$1" "display_name" "$2"
+				;;
+			set-hidden)
+                                if [ -z "${1:-}" ] || [ -z "${2:-}" ]; then
+					printf 'Missing interface name or hidden value.\n' >&2
+					exit 1
+                                fi
+                                wp_config_set_metadata_field "$1" "hidden" "$2"
+				;;
+			set-order)
+                                if [ -z "${1:-}" ] || [ -z "${2:-}" ]; then
+					printf 'Missing interface name or order value.\n' >&2
+					exit 1
+                                fi
+                                wp_config_set_metadata_field "$1" "order" "$2"
+				;;
+			*)
+				usage >&2
+				exit 1
+				;;
+		esac
+		;;
+	help|-h|--help)
+		usage
+		;;
+	sync)
+		wp_sync_pingcheck_config >/dev/null 2>&1 || true
+		printf '{"ok":true}\n'
+		;;
+	*)
+		usage >&2
+		exit 1
+		;;
+esac

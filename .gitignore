@@ -1,0 +1,15 @@
+# Repository hygiene for WANPilot source and build artifacts.
+.DS_Store
+.github/
+install-local.sh
+wanpilot-test*
+*.tar.gz
+*.swp
+*.swo
+*.tmp
+*.orig
+/dist/
+/bin/
+/build/
+/tmp/
+*.ipk

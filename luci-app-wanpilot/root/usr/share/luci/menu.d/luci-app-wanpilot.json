@@ -1,0 +1,30 @@
+{
+  "admin/network/wanpilot": {
+    "title": "WANPilot",
+    "order": 75,
+    "action": {
+      "type": "firstchild"
+    },
+    "depends": {
+      "acl": [
+        "luci-app-wanpilot"
+      ]
+    }
+  },
+  "admin/network/wanpilot/config": {
+    "title": "Configuration",
+    "order": 1,
+    "action": {
+      "type": "view",
+      "path": "wanpilot/config"
+    }
+  },
+  "admin/network/wanpilot/status": {
+    "title": "Runtime Status",
+    "order": 2,
+    "action": {
+      "type": "view",
+      "path": "wanpilot/status"
+    }
+  }
+}
